@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Amazing Chat</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #222;
+      color: #ddd;
+      margin: 0;
+      padding: 0;
+    }
+
+    #container {
+      max-width: 800px;
+      margin: 20px auto;
+      background-color: #333;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+      padding: 20px;
+    }
+
+    h1 {
+      text-align: center;
+    }
+
+    label {
+      font-weight: bold;
+    }
+
+    input[type="text"],
+    button {
+      margin: 5px 0;
+      padding: 10px;
+      border: none;
+      border-radius: 5px;
+      outline: none;
+      background-color: #444;
+      color: #ddd;
+    }
+
+    input[type="text"] {
+      width: calc(100% - 70px);
+    }
+
+    button {
+      width: 100px;
+      cursor: pointer;
+      background-color: #007bff;
+      color: #fff;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    #messages {
+      list-style-type: none;
+      padding: 0;
+      margin: 10px 0;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    #messages li {
+      margin-bottom: 10px;
+      padding: 15px;
+      border-radius: 15px;
+      max-width: 70%;
+      word-wrap: break-word;
+    }
+
+    #messages li.user-message {
+      background-color: #007bff;
+      color: #fff;
+      align-self: flex-end;
+    }
+
+    #messages li.other-message {
+      background-color: #4e4e4e;
+    }
+
+    #typingIndicator {
+      font-style: italic;
+      color: #888;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="container">
+    <h1>Amazing Chat</h1>
+    <label for="username">Username:</label>
+    <input type="text" id="username">
+    <hr>
+    <label for="room">Room:</label>
+    <input type="text" id="room">
+    <button onclick="createRoom()">Create Room</button>
+    <button onclick="joinRoom()">Join Room</button>
+    <hr>
+    <div id="chat">
+      <ul id="messages"></ul>
+    </div>
+    <input type="text" id="message" placeholder="Type your message..." onkeypress="handleKeyPress(event)"
+      onkeydown="sendTypingEvent(true)" onkeyup="sendTypingEvent(false)">
+    <button onclick="sendMessage()">Send</button>
+    <div id="typingIndicator" style="display: none;">Someone is typing...</div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+
+    function setUsername() {
+      const username = document.getElementById('username').value;
+      if (username.trim()) {
+        socket.emit('setUsername', username);
+      }
+    }
+
+    function createRoom() {
+      const room = document.getElementById('room').value;
+      const username = document.getElementById('username').value;
+      if (room.trim() && username.trim()) {
+        socket.emit('createRoom', room, username);
+      }
+    }
+
+    function joinRoom() {
+      const room = document.getElementById('room').value;
+      const username = document.getElementById('username').value;
+      if (room.trim() && username.trim()) {
+        socket.emit('joinRoom', room, username);
+      }
+    }
+
+    function handleKeyPress(event) {
+      if (event.key === "Enter") {
+        sendMessage(); // Call sendMessage function when Enter key is pressed
+      }
+    }
+
+    function sendMessage() {
+      const messageInput = document.getElementById('message');
+      const message = messageInput.value.trim();
+
+      if (message) {
+        socket.emit('sendMessage', message);
+        messageInput.value = ''; // Clear the input field after sending the message
+      }
+    }
+
+    socket.on('userJoined', (username) => {
+      showMessage(`${username} joined the room.`);
+    });
+
+    socket.on('userLeft', (username) => {
+      showMessage(`${username} left the room.`);
+    });
+
+    socket.on('message', (data) => {
+      showMessage(data.username, data.message);
+    });
+
+    socket.on('activeUsers', (users) => {
+      showMessage(`Active users in the room: ${users.join(', ')}`);
+    });
+
+    function showMessage(username, message) {
+      const messages = document.getElementById('messages');
+      const li = document.createElement('li');
+      li.textContent = `${username}: ${message}`;
+      li.className = (username === document.getElementById('username').value) ? 'user-message' : 'other-message';
+      messages.appendChild(li);
+      messages.scrollTop = messages.scrollHeight; // Auto scroll to bottom
+    }
+
+    let typingTimeout;
+
+    function sendTypingEvent(isTyping) {
+      clearTimeout(typingTimeout);
+      if (isTyping) {
+        socket.emit('typing');
+      } else {
+        socket.emit('stopTyping');
+      }
+    }
+
+    socket.on('userTyping', (username) => {
+      const typingIndicator = document.getElementById('typingIndicator');
+      typingIndicator.style.display = 'block';
+      typingIndicator.textContent = `${username} is typing...`;
+
+      typingTimeout = setTimeout(() => {
+        typingIndicator.style.display = 'none';
+      }, 2000);
+    });
+
+    socket.on('userStopTyping', () => {
+      // Do nothing if already hiding
+      if (typingTimeout) return;
+
+      const typingIndicator = document.getElementById('typingIndicator');
+      typingIndicator.style.display = 'none';
+    });
+  </script>
+</body>
+
+</html>
